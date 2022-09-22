@@ -32,9 +32,14 @@ module id(  input wire rst,
 	        output reg    branch_flag_o,
 	        output reg[`RegBus]   branch_target_address_o,       
 	        output reg[`RegBus]   link_addr_o,
+            output wire[31:0]             excepttype_o,//information of abnormal
+            output wire[`RegBus]          current_inst_address_o,
 	        output reg    is_in_delayslot_o
 );
-    
+    reg stallreq_for_reg1_loadrelate;
+    reg stallreq_for_reg2_loadrelate;
+    wire pre_inst_is_load;
+
     wire[5:0] op  = inst_i[31:26];
     wire[4:0] op2 = inst_i[10:6];
     wire[5:0] op3 = inst_i[5:0];
@@ -44,10 +49,12 @@ module id(  input wire rst,
     wire[`RegBus] pc_plus_8;
     wire[`RegBus] pc_plus_4;
     wire[`RegBus] imm_sll2_signedext; 
+    reg excepttype_is_syscall;
+    reg excepttype_is_eret;
     assign pc_plus_8 = pc_i + 8;//addr of pc+8
     assign pc_plus_4 = pc_i +4;//addr of pc+4
     assign imm_sll2_signedext = {{14{inst_i[15]}}, inst_i[15:0], 2'b00 };  
-    assign stallreq = `NoStop;
+    assign stallreq = stallreq_for_reg1_loadrelate | stallreq_for_reg2_loadrelate;
     assign inst_o = inst_i;
     assign pre_inst_is_load = ((ex_aluop_i == `EXE_LB_OP) || 
   													(ex_aluop_i == `EXE_LBU_OP)||
@@ -59,6 +66,7 @@ module id(  input wire rst,
   													(ex_aluop_i == `EXE_LL_OP) ||
   													(ex_aluop_i == `EXE_SC_OP)) ? 1'b1 : 1'b0;
 
+    assign excepttype_o = {19'b0,excepttype_is_eret,2'b0,instvalid, excepttype_is_syscall,8'b0};//low 8bit for outer interrupt,9 bit for syscall,10 but identify efficient,11 bit for trap
     always @ (*) begin
         if (rst == `RstEnable) begin
 			aluop_o <= `EXE_NOP_OP;
@@ -76,6 +84,9 @@ module id(  input wire rst,
 			branch_target_address_o <= `ZeroWord;
 			branch_flag_o <= `NotBranch;
 			next_inst_in_delayslot_o <= `NotInDelaySlot;
+            //abnormal
+            excepttype_is_syscall <= `False_v;
+			excepttype_is_eret <= `False_v;								
         end
         else begin
             aluop_o     <= `EXE_NOP_OP;
@@ -372,6 +383,16 @@ module id(  input wire rst,
                     instvalid <= `InstValid;	
 		  		    alusel_o <= `EXE_RES_LOAD_STORE; 
 				end
+				`EXE_SC:    begin
+		  		    wreg_o <= `WriteEnable;
+                    aluop_o <= `EXE_SC_OP;
+		  		    alusel_o <= `EXE_RES_LOAD_STORE;
+                    reg1_read_o <= 1'b1;
+                    reg2_read_o <= 1'b1;	  	
+					wd_o <= inst_i[20:16]; 
+                    instvalid <= `InstValid;	
+					alusel_o <= `EXE_RES_LOAD_STORE; 
+				end				
                 `EXE_SPECIAL_INST:	begin//op == 0
                     case (op2)
                         5'b00000: begin
@@ -603,6 +624,67 @@ module id(  input wire rst,
                     default:	begin
                     end
                     endcase
+                    case (op3)//abnormal
+					    `EXE_TEQ: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TEQ_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b0;
+                            reg2_read_o <= 1'b0;
+		  					instvalid <= `InstValid;
+		  				end
+		  				`EXE_TGE: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TGE_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b1;
+		  					instvalid <= `InstValid;
+		  				end		
+		  				`EXE_TGEU: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TGEU_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b1;
+		  					instvalid <= `InstValid;
+		  				end	
+		  				`EXE_TLT: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TLT_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b1;
+		  					instvalid <= `InstValid;
+		  				end
+		  				`EXE_TLTU: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TLTU_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b1;
+		  					instvalid <= `InstValid;
+		  				end	
+		  				`EXE_TNE: begin
+							wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TNE_OP;
+		  					alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b1;
+		  					instvalid <= `InstValid;
+		  				end
+		  				`EXE_SYSCALL: begin
+								wreg_o <= `WriteDisable;
+                                aluop_o <= `EXE_SYSCALL_OP;
+		  						alusel_o <= `EXE_RES_NOP;
+                                reg1_read_o <= 1'b0;
+                                    reg2_read_o <= 1'b0;
+		  						instvalid <= `InstValid;
+                                excepttype_is_syscall<= `True_v;
+		  					end							 																					
+						default:	begin
+						end	
+					endcase									
                 end
 				`EXE_REGIMM_INST:		begin
 					case (op4)
@@ -659,6 +741,60 @@ module id(  input wire rst,
 			    		    	next_inst_in_delayslot_o <= `InDelaySlot;
 			   			end
 						end
+                        `EXE_TEQI:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TEQI_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end
+						`EXE_TGEI:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TGEI_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end
+						`EXE_TGEIU:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TGEIU_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end
+						`EXE_TLTI:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TLTI_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end
+						`EXE_TLTIU:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TLTIU_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end
+						`EXE_TNEI:			begin
+		  				    wreg_o <= `WriteDisable;
+                            aluop_o <= `EXE_TNEI_OP;
+		  				    alusel_o <= `EXE_RES_NOP;
+                            reg1_read_o <= 1'b1;
+                            reg2_read_o <= 1'b0;	  	
+						    imm <= {{16{inst_i[15]}}, inst_i[15:0]};		  	
+						    instvalid <= `InstValid;	
+						end						
 						default:	begin
 						end
 					endcase
@@ -739,7 +875,7 @@ module id(  input wire rst,
                     imm[4:0]    <= inst_i[10:6];
                     wd_o        <= inst_i[15:11];
                     instvalid   <= `InstValid;
-                    end else if (op3 == `EXE_SRL) begin
+                end else if (op3 == `EXE_SRL) begin
                     wreg_o      <= `WriteEnable;
                     aluop_o     <= `EXE_SRL_OP;
                     alusel_o    <= `EXE_RES_SHIFT;
@@ -748,7 +884,7 @@ module id(  input wire rst,
                     imm[4:0]    <= inst_i[10:6];
                     wd_o        <= inst_i[15:11];
                     instvalid   <= `InstValid;
-                    end else if (op3 == `EXE_SRA) begin
+                end else if (op3 == `EXE_SRA) begin
                     wreg_o      <= `WriteEnable;
                     aluop_o     <= `EXE_SRA_OP;
                     alusel_o    <= `EXE_RES_SHIFT;
@@ -759,29 +895,60 @@ module id(  input wire rst,
                     instvalid   <= `InstValid;
                 end
             end
-            end       //if
+            if(inst_i == `EXE_ERET) begin//eret
+				wreg_o <= `WriteDisable;
+                aluop_o <= `EXE_ERET_OP;
+		  	    alusel_o <= `EXE_RES_NOP;
+                reg1_read_o <= 1'b0;
+                reg2_read_o <= 1'b0;
+		  	    instvalid <= `InstValid;
+                excepttype_is_eret<= `True_v;				
+			end else if(inst_i[31:21] == 11'b01000000000 && inst_i[10:0] == 11'b00000000000) begin//mfc0 cp0 rd to rt
+				aluop_o <= `EXE_MFC0_OP;
+				alusel_o <= `EXE_RES_MOVE;
+				wd_o <= inst_i[20:16];
+				wreg_o <= `WriteEnable;
+				instvalid <= `InstValid;	   
+				reg1_read_o <= 1'b0;
+				reg2_read_o <= 1'b0;		
+			end else if(inst_i[31:21] == 11'b01000000100 && inst_i[10:0] == 11'b00000000000) begin//mtc0 rt value to cp0 rd
+				aluop_o <= `EXE_MTC0_OP;
+				alusel_o <= `EXE_RES_NOP;
+				wreg_o <= `WriteDisable;
+				instvalid <= `InstValid;	   
+				reg1_read_o <= 1'b1;
+				reg1_addr_o <= inst_i[20:16];
+				reg2_read_o <= 1'b0;					
+			end
+        end       //if
     end         //always
     
     
     always @ (*) begin
+		stallreq_for_reg1_loadrelate <= `NoStop;	
         if (rst == `RstEnable) begin
-            reg1_o <= `ZeroWord;
-            end else if ((reg1_read_o == 1'b1) && (ex_wreg_i == 1'b1) && (ex_wd_i == reg1_addr_o)) begin//goal reg clash with step of ex
-            reg1_o <= ex_wdata_i;
-            end else if ((reg1_read_o == 1'b1) && (mem_wreg_i == 1'b1) && (mem_wd_i == reg1_addr_o)) begin //goal reg clash with step of mem
+           	reg1_o <= `ZeroWord;	
+        end else if(pre_inst_is_load == 1'b1 && ex_wd_i == reg1_addr_o && reg1_read_o == 1'b1 ) begin//goal reg clash with step of ex
+            stallreq_for_reg1_loadrelate <= `Stop;
+		end else if((reg1_read_o == 1'b1) && (ex_wreg_i == 1'b1)    && (ex_wd_i == reg1_addr_o)) begin
+			reg1_o <= ex_wdata_i; 
+        end else if ((reg1_read_o == 1'b1) && (mem_wreg_i == 1'b1) && (mem_wd_i == reg1_addr_o)) begin //goal reg clash with step of mem
             reg1_o <= mem_wdata_i;
-            end else if (reg1_read_o == 1'b1) begin
+        end else if (reg1_read_o == 1'b1) begin
             reg1_o <= reg1_data_i;
-            end else if (reg1_read_o == 1'b0) begin
+        end else if (reg1_read_o == 1'b0) begin
             reg1_o <= imm;
-            end else begin
+        end else begin
             reg1_o <= `ZeroWord;
         end
     end
     
     always @ (*) begin
+        stallreq_for_reg2_loadrelate <= `NoStop;
         if (rst == `RstEnable) begin
             reg2_o <= `ZeroWord;
+        end else if(pre_inst_is_load == 1'b1 && ex_wd_i == reg2_addr_o && reg2_read_o == 1'b1 ) begin
+		        stallreq_for_reg2_loadrelate <= `Stop;	
             end else if ((reg2_read_o == 1'b1) && (ex_wreg_i == 1'b1) && (ex_wd_i == reg2_addr_o)) begin//goal reg clash with step of ex
             reg2_o <= ex_wdata_i;
             end else if ((reg2_read_o == 1'b1) && (mem_wreg_i == 1'b1) && (mem_wd_i == reg2_addr_o)) begin //goal reg clash with step of mem

@@ -1,0 +1,31 @@
+# OpenMIPS
+## 簡介
+此項目為大三下暑假的學習項目，為了提昇 Verilog 水平，我跟著”自己動手寫 CPU”學習 CPU 的設計流程，項目因為硬體需求止步於教學版。
+## 模塊
++ cp0_reg.v   
++ flow           
++ LLbit_reg.v             
++ ctrl.v      
++ hilo_reg.v     
++ mem.v                   
++ regfile.v
++ data_ram.v  
++ id_ex.v        
++ mem_wb.v                
++ verilog_file.f
++ defines.v   
++ id.v           
++ openmips_min_sopc_tb.v  
++ wave
++ div.v       
++ if_id.v        
++ openmips_min_sopc.v     
++ wave.vcd
++ ex_mem.v    
++ inst_rom.data  
++ openmips.v
++ ex.v        
++ inst_rom.v     
++ pc_reg.v
+## 難點
+VCS的安裝在Archlinux上非常困難，首先GLIBC_PRIVATE的問題照論壇上的解法也失效，再者遇到g++-4.8: error: unrecognized command line option '-no-pie'的問題雖然在論壇上有解法但是都是針對g++的，在vcs上無法加參，有點頭痛。最後還是使用虛擬機使用CentOS才能夠使用VCS的。

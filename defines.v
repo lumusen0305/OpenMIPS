@@ -201,6 +201,9 @@
 `define EXE_SWR_OP  8'b11101110
 `define EXE_SYNC_OP  8'b00001111
 
+`define EXE_MFC0_OP 8'b01011101
+`define EXE_MTC0_OP 8'b01100000
+
 `define EXE_NOP_OP    8'b00000000
 `define EXE_SPECIAL_INST 6'b000000
 `define EXE_REGIMM_INST 6'b000001
@@ -213,7 +216,24 @@
 `define EXE_RES_MUL 3'b101
 `define EXE_RES_JUMP_BRANCH 3'b110
 `define EXE_RES_LOAD_STORE 3'b111	
+//abnormal
 
+`define EXE_SYSCALL_OP 8'b00001100
+
+`define EXE_TEQ_OP 8'b00110100
+`define EXE_TEQI_OP 8'b01001000
+`define EXE_TGE_OP 8'b00110000
+`define EXE_TGEI_OP 8'b01000100
+`define EXE_TGEIU_OP 8'b01000101
+`define EXE_TGEU_OP 8'b00110001
+`define EXE_TLT_OP 8'b00110010
+`define EXE_TLTI_OP 8'b01000110
+`define EXE_TLTIU_OP 8'b01000111
+`define EXE_TLTU_OP 8'b00110011
+`define EXE_TNE_OP 8'b00110110
+`define EXE_TNEI_OP 8'b01001001
+   
+`define EXE_ERET_OP 8'b01101011
 `define EXE_RES_NOP 3'b000
 
 
@@ -255,3 +275,11 @@
 `define DataMemNum 131071//size of ram 128k
 `define DataMemNumLog2 17//accurately word bit 
 `define ByteWidth 7:0 //1 word bit 
+//CPU0
+`define CP0_REG_COUNT    5'b01001        //  rw
+`define CP0_REG_COMPARE    5'b01011      //  rw
+`define CP0_REG_STATUS    5'b01100       //  rw
+`define CP0_REG_CAUSE    5'b01101        // read only
+`define CP0_REG_EPC    5'b01110          //  rw
+`define CP0_REG_PrId    5'b01111         // read only
+`define CP0_REG_CONFIG    5'b10000       // read only
